@@ -17,15 +17,15 @@ with codecs.open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='chess-annotator',
+    name='shogi-annotator',
 
-    description='adds comments and analysis to chess games',
+    description='adds comments and analysis to shogi games',
     long_description=long_description,
 
     version='1.1.4',
 
     # The project's main homepage.
-    url='https://github.com/rpdelaney/python-chess-annotator',
+    url='https://github.com/rpdelaney/python-shogi-annotator',
 
     # Author details
     author='Ryan Delaney',
@@ -68,7 +68,7 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='chess',
+    keywords='shogi',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
@@ -82,7 +82,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['python-chess==0.27.3'],
+    install_requires=['python-shogi==0.27.3'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,

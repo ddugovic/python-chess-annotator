@@ -14,10 +14,10 @@ import argparse
 import json
 import logging
 import math
-import chess
-import chess.pgn
-import chess.uci
-import chess.variant
+import shogi
+import shogi.psn
+import shogi.usi
+import shogi.variant
 
 
 # Constants
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 if not logger.handlers:
     ch = logging.StreamHandler()
     logger.addHandler(ch)
-# Uncomment this line to get EXTREMELY verbose UCI communication logging:
+# Uncomment this line to get EXTREMELY verbose USI communication logging:
 # logging.basicConfig(level=logging.DEBUG)
 
 
@@ -46,12 +46,12 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(
         prog='annotator',
-        description='takes chess games in a PGN file and prints '
+        description='takes shogi games in a PSN file and prints '
         'annotations to standard output')
     parser.add_argument("--file", "-f",
-                        help="input PGN file",
+                        help="input PSN file",
                         required=True,
-                        metavar="FILE.pgn")
+                        metavar="FILE.psn")
     parser.add_argument("--engine", "-e",
                         help="analysis engine (default: %(default)s)",
                         default="stockfish")
@@ -245,11 +245,11 @@ def get_nags(judgment):
     delta = judgment["playedeval"] - judgment["besteval"]
 
     if delta < ERROR_THRESHOLD["BLUNDER"]:
-        return [chess.pgn.NAG_BLUNDER]
+        return [shogi.psn.NAG_BLUNDER]
     elif delta < ERROR_THRESHOLD["MISTAKE"]:
-        return [chess.pgn.NAG_MISTAKE]
+        return [shogi.psn.NAG_MISTAKE]
     elif delta < ERROR_THRESHOLD["DUBIOUS"]:
-        return [chess.pgn.NAG_DUBIOUS_MOVE]
+        return [shogi.psn.NAG_DUBIOUS_MOVE]
     else:
         return []
 
@@ -320,13 +320,13 @@ def add_annotation(node, judgment):
 
 def classify_fen(fen, ecodb):
     """
-    Searches a JSON file with Encyclopedia of Chess Openings (ECO) data to
+    Searches a JSON file with Encyclopedia of Chess Openings (ESO) data to
     check if the given FEN matches an existing opening record
 
     Returns a classification
 
     A classfication is a dictionary containing the following elements:
-        "code":         The ECO code of the matched opening
+        "code":         The ESO code of the matched opening
         "desc":         The long description of the matched opening
         "path":         The main variation of the opening
     """
@@ -446,7 +446,7 @@ def game_length(game):
 
 def classify_opening(game):
     """
-    Takes a game and adds an ECO code classification for the opening
+    Takes a game and adds an ESO code classification for the opening
     Returns the classified game and root_node, which is the node where the
     classification was made
     """
@@ -459,21 +459,6 @@ def classify_opening(game):
         root_node = game.root()
         node = game.end()
 
-        # Opening classification for variant games is not implemented (yet?)
-        is_960 = root_node.board().chess960
-        if is_960:
-            variant = "chess960"
-        else:
-            variant = type(node.board()).uci_variant
-
-        if variant != "chess":
-            logger.info("Skipping opening classification in variant "
-                        "game: {}".format(variant))
-            return node.root(), root_node, game_length(game)
-
-        logger.info("Classifying the opening for non-variant {} "
-                    "game...".format(variant))
-
         while not node == game.root():
             prev_node = node.parent
 
@@ -482,7 +467,7 @@ def classify_opening(game):
 
             if classification["code"] != "":
                 # Add some comments classifying the opening
-                node.root().headers["ECO"] = classification["code"]
+                node.root().headers["ESO"] = classification["code"]
                 node.root().headers["Opening"] = classification["desc"]
                 node.comment = "{} {}".format(classification["code"],
                                               classification["desc"])
@@ -500,7 +485,7 @@ def classify_opening(game):
 
 def add_acpl(game, root_node):
     """
-    Takes a game and a root node, and adds PGN headers with the computed ACPL
+    Takes a game and a root node, and adds PSN headers with the computed ACPL
     (average centipawn loss) for each player. Returns a game with the added
     headers.
     """
@@ -545,17 +530,17 @@ def get_time_per_move(pass_budget, ply_count):
 
 def analyze_game(game, arg_gametime, enginepath, threads):
     """
-    Take a PGN game and return a GameNode with engine analysis added
-    - Attempt to classify the opening with ECO and identify the root node
-        * The root node is the position immediately after the ECO
+    Take a PSN game and return a GameNode with engine analysis added
+    - Attempt to classify the opening with ESO and identify the root node
+        * The root node is the position immediately after the ESO
         classification
-        * This allows us to skip analysis of moves that have an ECO
+        * This allows us to skip analysis of moves that have an ESO
         classification
     - Analyze the game, adding annotations where appropriate
     - Return the root node with annotations
     """
 
-    # First, check the game for PGN parsing errors
+    # First, check the game for PSN parsing errors
     # This is done so that we don't waste CPU time on nonsense games
     checkgame(game)
 
@@ -563,7 +548,7 @@ def analyze_game(game, arg_gametime, enginepath, threads):
     # Initialize the engine
     ###########################################################################
     try:
-        engine = chess.uci.popen_engine(enginepath)
+        engine = shogi.usi.popen_engine(enginepath)
     except FileNotFoundError:
         errormsg = "Engine '{}' was not found. Aborting...".format(enginepath)
         logger.critical(errormsg)
@@ -574,48 +559,12 @@ def analyze_game(game, arg_gametime, enginepath, threads):
         logger.critical(errormsg)
         raise
 
-    engine.uci()
-    info_handler = chess.uci.InfoHandler()
+    engine.usi()
+    info_handler = shogi.usi.InfoHandler()
     engine.info_handlers.append(info_handler)
-    if game.board().uci_variant != "chess" or game.root().board().chess960:
-        # This is a variant game, so confirm that the engine we're using
-        # supports the variant.
-        if game.root().board().chess960:
-            try:
-                engine.options["UCI_Chess960"]
-            except KeyError:
-                message = "UCI_Chess960 is not supported by the engine " \
-                    "and this is a chess960 game."
-                logger.critical(message)
-                raise RuntimeError(message)
-
-        if game.board().uci_variant != "chess":
-            try:
-                engine_variants = engine.options["UCI_Variant"].var
-                if not game.board().uci_variant in engine_variants:
-                    raise AssertionError
-            except KeyError:
-                message = "UCI_Variant option is not supported by the " \
-                    "engine and this is a variant game."
-                logger.critical(message)
-                raise RuntimeError(message)
-            except AssertionError:
-                message = "Variant {} is not supported by the engine.".format(
-                    game.board().uci_variant)
-                logger.critical(message)
-                raise RuntimeError(message)
-
-        # Now that engine support for the variant is confirmed, set engine UCI
-        # options as appropriate for the variant
-        engine.setoption({
-            "UCI_Variant": game.board().uci_variant,
-            "UCI_Chess960": game.board().chess960,
-            "Threads": threads
-        })
-    else:
-        engine.setoption({
-            "Threads": threads
-        })
+    engine.setoption({
+        "Threads": threads
+    })
 
     # Start keeping track of the root node
     # This will change if we successfully classify the opening
@@ -755,20 +704,20 @@ def analyze_game(game, arg_gametime, enginepath, threads):
 
 def checkgame(game):
     """
-    Check for PGN parsing errors and abort if any were found
+    Check for PSN parsing errors and abort if any were found
     This prevents us from burning up CPU time on nonsense positions
     """
     if game.errors:
-        errormsg = "There were errors parsing the PGN game:"
+        errormsg = "There were errors parsing the PSN game:"
         logger.critical(errormsg)
         for error in game.errors:
             logger.critical(error)
         logger.critical("Aborting...")
         raise RuntimeError(errormsg)
 
-    # Try to verify that the PGN file was readable
+    # Try to verify that the PSN file was readable
     if game.end().parent is None:
-        errormsg = "Could not render the board. Is the file legal PGN?" \
+        errormsg = "Could not render the board. Is the file legal PSN?" \
             "Aborting..."
         logger.critical(errormsg)
         raise RuntimeError(errormsg)
@@ -778,17 +727,17 @@ def main():
     """
     Main function
 
-    - Load games from the PGN file
+    - Load games from the PSN file
     - Annotate each game, and print the game with the annotations
     """
     args = parse_args()
     setup_logging(args)
     engine = args.engine.split()
 
-    pgnfile = args.file
+    psnfile = args.file
     try:
-        with open(pgnfile) as pgn:
-            for game in iter(lambda: chess.pgn.read_game(pgn), None):
+        with open(psnfile) as psn:
+            for game in iter(lambda: shogi.psn.read_game(psn), None):
                 try:
                     analyzed_game = analyze_game(game, args.gametime,
                                                  engine, args.threads)

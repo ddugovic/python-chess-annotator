@@ -1,11 +1,11 @@
-python-chess-annotator
+python-shogi-annotator
 ======================
 |MAINTAINED| |LANGUAGE| |VERSION|
 
 .. |MAINTAINED| image:: https://img.shields.io/maintenance/no/2019?logoColor=informational
-.. |LANGUAGE| image:: https://img.shields.io/pypi/pyversions/chess-annotator
-.. |VERSION| image:: https://img.shields.io/pypi/v/chess-annotator
-   :target: https://pypi.org/project/chess-annotator
+.. |LANGUAGE| image:: https://img.shields.io/pypi/pyversions/shogi-annotator
+.. |VERSION| image:: https://img.shields.io/pypi/v/shogi-annotator
+   :target: https://pypi.org/project/shogi-annotator
 
 Takes a PGN file as an argument and annotates the games in that file
 using an engine.
@@ -21,19 +21,13 @@ Installation
 
 ::
 
-    pip3 install chess-annotator
+    pip3 install shogi-annotator
 
 Dependencies
 ------------
 
-You will need a `UCI <https://chessprogramming.wikispaces.com/UCI>`_
-chess engine for analysis.
-`stockfish <https://stockfishchess.org/download/>`_ is the default.
-
-Any of the `variants supported by python-chess <https://python-chess.readthedocs.io/en/v0.27.3/variant.html>`_ should work.
-You will need a UCI engine that supports the variant you are trying to analyze.
-`Daniel Dugovic's stockfish fork <https://github.com/ddugovic/Stockfish>`_
-supports most of the popular variants.
+You will need a `USI <https://shogiprogramming.wikispaces.com/USI>`_
+shogi engine for analysis.
 
 ============
 Development
@@ -44,7 +38,7 @@ git clone does not do this by default:
 
 ::
 
-    git clone --recurse-submodules git@github.com:rpdelaney/python-chess-annotator.git
+    git clone --recurse-submodules git@github.com:rpdelaney/python-shogi-annotator.git
 
 
 To install development dependencies, you will need `pipenv <https://docs.pipenv.org/en/latest/>`_
@@ -64,7 +58,7 @@ Usage
     usage: annotator [-h] --file FILE.pgn [--engine ENGINE] [--gametime MINUTES]
                      [--threads THREADS] [--verbose]
 
-    takes chess games in a PGN file and prints annotations to standard output
+    takes shogi games in a PGN file and prints annotations to standard output
 
     optional arguments:
       -h, --help            show this help message and exit

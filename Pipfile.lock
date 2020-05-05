@@ -15,16 +15,6 @@
             }
         ]
     },
-    "default": {
-        "python-chess": {
-            "hashes": [
-                "sha256:7053ad0870ec889cb558298278887cd8b977ca5e752f452f5f0f1de67f7d18cf",
-                "sha256:8b5745ae1cd250247ba2a5a2cefc3b3a1015e8f04909aca5ac1686f6102c1e24"
-            ],
-            "index": "pypi",
-            "version": "==0.27.3"
-        }
-    },
     "develop": {
         "atomicwrites": {
             "hashes": [
