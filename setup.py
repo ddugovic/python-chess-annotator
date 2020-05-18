@@ -22,7 +22,7 @@ setup(
     description='adds comments and analysis to chess games',
     long_description=long_description,
 
-    version='1.1.4',
+    version='1.2.0',
 
     # The project's main homepage.
     url='https://github.com/ddugovic/python-chess-annotator',
