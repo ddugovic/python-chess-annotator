@@ -25,11 +25,7 @@ setup(
     version='1.1.4',
 
     # The project's main homepage.
-    url='https://github.com/rpdelaney/python-chess-annotator',
-
-    # Author details
-    author='Ryan Delaney',
-    author_email='ryan.delaney@gmail.com',
+    url='https://github.com/ddugovic/python-chess-annotator',
 
     # Choose your license
     license='GPL3',
