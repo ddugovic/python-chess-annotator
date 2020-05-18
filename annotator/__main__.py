@@ -11,7 +11,7 @@ __copyright__ = """© Copyright 2016-2018 Ryan Delaney. All rights reserved.
 
 import os
 import argparse
-import json
+import csv
 import logging
 import math
 import chess
@@ -318,9 +318,9 @@ def add_annotation(node, judgment):
     node.nags = get_nags(judgment)
 
 
-def classify_fen(fen, ecodb):
+def classify_fen(fen, ecopath):
     """
-    Searches a JSON file with Encyclopedia of Chess Openings (ECO) data to
+    Searches Encyclopedia of Chess Openings (ECO) files to
     check if the given FEN matches an existing opening record
 
     Returns a classification
@@ -335,19 +335,24 @@ def classify_fen(fen, ecodb):
     classification["desc"] = ""
     classification["path"] = ""
 
-    for opening in ecodb:
-        if opening['f'] == fen:
-            classification["code"] = opening['c']
-            classification["desc"] = opening['n']
-            classification["path"] = opening['m']
+    with open(ecopath, 'r') as ecofile:
+        reader = csv.reader(ecofile, delimiter='\t')
+
+        next(reader)
+        for opening in reader:
+            c, d, f, p = opening
+            if f == fen:
+                classification["code"] = c
+                classification["desc"] = d
+                classification["path"] = p
+                return classification
 
     return classification
 
 
 def eco_fen(board):
     """
-    Takes a board position and returns a FEN string formatted for matching with
-    eco.json
+    Takes a board position and returns a FEN string.
     """
     board_fen = board.board_fen()
     castling_fen = board.castling_xfen()
@@ -450,9 +455,8 @@ def classify_opening(game):
     Returns the classified game and root_node, which is the node where the
     classification was made
     """
-    ecopath = os.path.join(os.path.dirname(__file__), 'eco/eco.json')
+    ecopath = os.path.join(os.path.dirname(__file__), 'eco/a.tsv')
     with open(ecopath, 'r') as ecofile:
-        ecodata = json.load(ecofile)
 
         ply_count = 0
 
@@ -478,7 +482,7 @@ def classify_opening(game):
             prev_node = node.parent
 
             fen = eco_fen(node.board())
-            classification = classify_fen(fen, ecodata)
+            classification = classify_fen(fen, ecofile)
 
             if classification["code"] != "":
                 # Add some comments classifying the opening

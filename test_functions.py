@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock
 import random
 from io import StringIO
-import json
+import csv
 import os
 
 import chess
@@ -400,22 +400,21 @@ class test_add_annotation(unittest.TestCase):
 
 class test_classify_fen(unittest.TestCase):
 
-    def test_eco_json(self):
-        ecopath = os.path.join(
-            os.path.dirname(__file__), '../annotator/eco/eco.json'
-        )
+    def test_eco_tsv(self):
+        ecopath = os.path.join(os.path.dirname(__file__), 'eco/a.tsv')
         with open(ecopath, 'r') as ecofile:
-            ecodata = json.load(ecofile)
+            reader = csv.reader(ecofile, delimiter='\t')
 
-            for row in ecodata:
-                fen = "{} {}".format(row["f"], '- 0 1')
-                chess.Board(fen=fen)
+            next(reader)
+            for row in reader:
+                code, desc, fen, path = row
+                chess.Board(fen + ' 0 1')
 
-                classification = annotator.classify_fen(row["f"], ecodata)
+                classification = annotator.classify_fen(fen, ecopath)
 
-                assert classification["code"] == row["c"]
-                assert classification["desc"] == row["n"]
-                assert classification["path"] == row["m"]
+                assert code == classification["code"]
+                assert desc == classification["desc"]
+                assert path == classification["path"]
 
 
 class test_clean_game(unittest.TestCase):
