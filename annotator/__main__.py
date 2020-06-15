@@ -61,11 +61,6 @@ def parse_args():
                         default="1",
                         type=float,
                         metavar="MINUTES")
-    parser.add_argument("--threads", "-t",
-                        help="threads for use by the engine \
-                            (default: %(default)s)",
-                        type=int,
-                        default=1)
     parser.add_argument("--verbose", "-v", help="increase verbosity",
                         action="count")
 
@@ -547,7 +542,7 @@ def get_time_per_move(pass_budget, ply_count):
     return float(pass_budget) / float(ply_count)
 
 
-def analyze_game(game, arg_gametime, enginepath, threads):
+def analyze_game(game, arg_gametime, enginepath):
     """
     Take a PGN game and return a GameNode with engine analysis added
     - Attempt to classify the opening with ECO and identify the root node
@@ -577,10 +572,6 @@ def analyze_game(game, arg_gametime, enginepath, threads):
             enginepath)
         logger.critical(errormsg)
         raise
-
-    engine.setoption({
-        "Threads": threads
-    })
 
     # Start keeping track of the root node
     # This will change if we successfully classify the opening
@@ -756,7 +747,7 @@ def main():
             for game in iter(lambda: chess.pgn.read_game(pgn), None):
                 try:
                     analyzed_game = analyze_game(game, args.gametime,
-                                                 engine, args.threads)
+                                                 engine)
                 except KeyboardInterrupt:
                     logger.critical("\nReceived KeyboardInterrupt.")
                     raise
