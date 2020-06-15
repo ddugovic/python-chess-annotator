@@ -15,8 +15,8 @@ import csv
 import logging
 import math
 import chess
+import chess.engine
 import chess.pgn
-import chess.uci
 import chess.variant
 
 
@@ -90,14 +90,14 @@ def setup_logging(args):
             logger.setLevel(logging.INFO)
 
 
-def eval_numeric(info_handler):
+def eval_numeric(analysis):
     """
     Returns a numeric evaluation of the position, even if depth-to-mate was
     found. This facilitates comparing numerical evaluations with depth-to-mate
     evaluations
     """
-    dtm = info_handler.info["score"][1].mate
-    cp = info_handler.info["score"][1].cp
+    dtm = analysis.info["score"][1].mate
+    cp = analysis.info["score"][1].cp
 
     if dtm is not None:
         # We have depth-to-mate (dtm), so translate it into a numerical
@@ -114,20 +114,20 @@ def eval_numeric(info_handler):
         # centipawns)
         return cp
 
-    # If we haven't returned yet, then the info_handler had garbage in it
-    raise RuntimeError("Evaluation found in the info_handler was "
+    # If we haven't returned yet, then the analysis had garbage in it
+    raise RuntimeError("Evaluation found in the analysis was "
                        "unintelligible")
 
 
-def eval_human(white_to_move, info_handler):
+def eval_human(white_to_move, analysis):
     """
     Returns a human-readable evaluation of the position:
         If depth-to-mate was found, return plain-text mate announcement
         (e.g. "Mate in 4")
         If depth-to-mate was not found, return an absolute numeric evaluation
     """
-    dtm = info_handler.info["score"][1].mate
-    cp = info_handler.info["score"][1].cp
+    dtm = analysis.info["score"][1].mate
+    cp = analysis.info["score"][1].cp
 
     if dtm is not None:
         return "Mate in {}".format(abs(dtm))
@@ -136,8 +136,8 @@ def eval_human(white_to_move, info_handler):
         # pawns)
         return '{:.2f}'.format(eval_absolute(cp / 100, white_to_move))
 
-    # If we haven't returned yet, then the info_handler had garbage in it
-    raise RuntimeError("Evaluation found in the info_handler was "
+    # If we haven't returned yet, then the analysis had garbage in it
+    raise RuntimeError("Evaluation found in the analysis was "
                        "unintelligible")
 
 
@@ -172,7 +172,7 @@ def needs_annotation(judgment):
     return delta > NEEDS_ANNOTATION_THRESHOLD
 
 
-def judge_move(board, played_move, engine, info_handler, searchtime_s):
+def judge_move(board, played_move, engine, searchtime_s):
     """
     Evaluate the strength of a given move by comparing it to engine's best
     move and evaluation at a given depth, in a given board context
@@ -201,17 +201,17 @@ def judge_move(board, played_move, engine, info_handler, searchtime_s):
     judgment = {}
 
     # First, get the engine bestmove and evaluation
-    engine.position(board)
-    engine.go(movetime=searchtime_ms / 2)
+    limit = chess.engine.Limit(movetime=searchtime_ms / 2)
+    analysis = engine.play(board, limit, game=object())
 
-    judgment["bestmove"] = info_handler.info["pv"][1][0]
-    judgment["besteval"] = eval_numeric(info_handler)
-    judgment["pv"] = info_handler.info["pv"][1]
-    judgment["depth"] = info_handler.info["depth"]
-    judgment["nodes"] = info_handler.info["nodes"]
+    judgment["bestmove"] = analysis.info["pv"][1][0]
+    judgment["besteval"] = eval_numeric(analysis)
+    judgment["pv"] = analysis.info["pv"][1]
+    judgment["depth"] = analysis.info["depth"]
+    judgment["nodes"] = analysis.info["nodes"]
 
     # Annotate the best move
-    judgment["bestcomment"] = eval_human(board.turn, info_handler)
+    judgment["bestcomment"] = eval_human(board.turn, analysis)
 
     # If the played move matches the engine bestmove, we're done
     if played_move == judgment["bestmove"]:
@@ -225,13 +225,13 @@ def judge_move(board, played_move, engine, info_handler, searchtime_s):
         # Store the numeric evaluation.
         # We invert the sign since we're now evaluating from the opponent's
         # perspective
-        judgment["playedeval"] = -eval_numeric(info_handler)
+        judgment["playedeval"] = -eval_numeric(analysis)
 
         # Take the played move off the stack (reset the board)
         board.pop()
 
     # Annotate the played move
-    judgment["playedcomment"] = eval_human(not board.turn, info_handler)
+    judgment["playedcomment"] = eval_human(not board.turn, analysis)
 
     return judgment
 
@@ -567,7 +567,7 @@ def analyze_game(game, arg_gametime, enginepath, threads):
     # Initialize the engine
     ###########################################################################
     try:
-        engine = chess.uci.popen_engine(enginepath)
+        engine = chess.engine.popen_uci(enginepath)
     except FileNotFoundError:
         errormsg = "Engine '{}' was not found. Aborting...".format(enginepath)
         logger.critical(errormsg)
@@ -578,48 +578,9 @@ def analyze_game(game, arg_gametime, enginepath, threads):
         logger.critical(errormsg)
         raise
 
-    engine.uci()
-    info_handler = chess.uci.InfoHandler()
-    engine.info_handlers.append(info_handler)
-    if game.board().uci_variant != "chess" or game.root().board().chess960:
-        # This is a variant game, so confirm that the engine we're using
-        # supports the variant.
-        if game.root().board().chess960:
-            try:
-                engine.options["UCI_Chess960"]
-            except KeyError:
-                message = "UCI_Chess960 is not supported by the engine " \
-                    "and this is a chess960 game."
-                logger.critical(message)
-                raise RuntimeError(message)
-
-        if game.board().uci_variant != "chess":
-            try:
-                engine_variants = engine.options["UCI_Variant"].var
-                if not game.board().uci_variant in engine_variants:
-                    raise AssertionError
-            except KeyError:
-                message = "UCI_Variant option is not supported by the " \
-                    "engine and this is a variant game."
-                logger.critical(message)
-                raise RuntimeError(message)
-            except AssertionError:
-                message = "Variant {} is not supported by the engine.".format(
-                    game.board().uci_variant)
-                logger.critical(message)
-                raise RuntimeError(message)
-
-        # Now that engine support for the variant is confirmed, set engine UCI
-        # options as appropriate for the variant
-        engine.setoption({
-            "UCI_Variant": game.board().uci_variant,
-            "UCI_Chess960": game.board().chess960,
-            "Threads": threads
-        })
-    else:
-        engine.setoption({
-            "Threads": threads
-        })
+    engine.setoption({
+        "Threads": threads
+    })
 
     # Start keeping track of the root node
     # This will change if we successfully classify the opening
@@ -673,7 +634,7 @@ def analyze_game(game, arg_gametime, enginepath, threads):
 
         # Get the engine judgment of the played move in this position
         judgment = judge_move(prev_node.board(), node.move, engine,
-                              info_handler, time_per_move)
+                              time_per_move)
 
         # Record the delta, to be referenced in the second pass
         node.comment = judgment
@@ -733,7 +694,7 @@ def analyze_game(game, arg_gametime, enginepath, threads):
         if needs_annotation(judgment):
             # Get the engine judgment of the played move in this position
             judgment = judge_move(prev_node.board(), node.move, engine,
-                                  info_handler, time_per_move)
+                                  time_per_move)
 
             # Verify that the engine still dislikes the played move
             if needs_annotation(judgment):
