@@ -31,7 +31,7 @@ chess engine for analysis.
 
 Any of the `variants supported by python-chess <https://python-chess.readthedocs.io/en/v0.27.3/variant.html>`_ should work.
 You will need a UCI engine that supports the variant you are trying to analyze.
-`Daniel Dugovic's stockfish fork <https://github.com/ddugovic/Stockfish>`_
+`Multi-Variant Stockfish <https://github.com/ddugovic/Stockfish>`_
 supports most of the popular variants.
 
 ============
@@ -43,7 +43,7 @@ git clone does not do this by default:
 
 ::
 
-    git clone --recurse-submodules git@github.com:rpdelaney/python-chess-annotator.git
+    git clone --recurse-submodules git@github.com:ddugovic/python-chess-annotator.git
 
 
 To install development dependencies, you will need `pipenv <https://docs.pipenv.org/en/latest/>`_
