@@ -9,6 +9,7 @@ __copyright__ = """© Copyright 2016-2018 Ryan Delaney. All rights reserved.
  software.
 """
 
+import asyncio
 import os
 import argparse
 import csv
@@ -168,7 +169,7 @@ def needs_annotation(judgment):
     return delta > NEEDS_ANNOTATION_THRESHOLD
 
 
-def judge_move(board, played_move, engine, searchtime_s):
+async def judge_move(board, played_move, engine, searchtime_s):
     """
     Evaluate the strength of a given move by comparing it to engine's best
     move and evaluation at a given depth, in a given board context
@@ -191,14 +192,11 @@ def judge_move(board, played_move, engine, searchtime_s):
           "nodes":         Number nodes searched
     """
 
-    # Calculate the search time in milliseconds
-    searchtime_ms = searchtime_s * 1000
-
     judgment = {}
 
     # First, get the engine bestmove and evaluation
-    limit = chess.engine.Limit(time=searchtime_ms / 2)
-    analysis = engine.play(board, limit, game=object())
+    limit = chess.engine.Limit(time=searchtime_s / float(2.0))
+    analysis = await engine.play(board, limit)
 
     judgment["bestmove"] = analysis.info["pv"][1][0]
     judgment["besteval"] = eval_numeric(analysis)
@@ -216,7 +214,7 @@ def judge_move(board, played_move, engine, searchtime_s):
         # get the engine evaluation of the played move
         board.push(played_move)
         engine.position(board)
-        engine.go(movetime=searchtime_ms / 2)
+        engine.go(movetime=searchtime_s / float(2.0))
 
         # Store the numeric evaluation.
         # We invert the sign since we're now evaluating from the opponent's
@@ -543,7 +541,7 @@ def get_time_per_move(pass_budget, ply_count):
     return float(pass_budget) / float(ply_count)
 
 
-def analyze_game(game, arg_gametime, enginepath):
+async def analyze_game(game, arg_gametime, enginepath):
     """
     Take a PGN game and return a GameNode with engine analysis added
     - Attempt to classify the opening with ECO and identify the root node
@@ -563,7 +561,7 @@ def analyze_game(game, arg_gametime, enginepath):
     # Initialize the engine
     ###########################################################################
     try:
-        engine = chess.engine.popen_uci(enginepath)
+        _, engine = await chess.engine.popen_uci(enginepath)
     except FileNotFoundError:
         errormsg = "Engine '{}' was not found. Aborting...".format(enginepath)
         logger.critical(errormsg)
@@ -625,7 +623,7 @@ def analyze_game(game, arg_gametime, enginepath):
         prev_node = node.parent
 
         # Get the engine judgment of the played move in this position
-        judgment = judge_move(prev_node.board(), node.move, engine,
+        judgment = await judge_move(prev_node.board(), node.move, engine,
                               time_per_move)
 
         # Record the delta, to be referenced in the second pass
@@ -685,7 +683,7 @@ def analyze_game(game, arg_gametime, enginepath):
 
         if needs_annotation(judgment):
             # Get the engine judgment of the played move in this position
-            judgment = judge_move(prev_node.board(), node.move, engine,
+            judgment = await judge_move(prev_node.board(), node.move, engine,
                                   time_per_move)
 
             # Verify that the engine still dislikes the played move
@@ -731,7 +729,7 @@ def checkgame(game):
         raise RuntimeError(errormsg)
 
 
-def main():
+async def main():
     """
     Main function
 
@@ -740,15 +738,15 @@ def main():
     """
     args = parse_args()
     setup_logging(args)
-    engine = args.engine.split()
+    enginepath = args.engine.split()
 
     pgnfile = args.file
     try:
         with open(pgnfile) as pgn:
             for game in iter(lambda: chess.pgn.read_game(pgn), None):
                 try:
-                    analyzed_game = analyze_game(game, args.gametime,
-                                                 engine)
+                    analyzed_game = await analyze_game(game, args.gametime,
+                                                       enginepath)
                 except KeyboardInterrupt:
                     logger.critical("\nReceived KeyboardInterrupt.")
                     raise
@@ -765,6 +763,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 
 # vim: ft=python expandtab smarttab shiftwidth=4 softtabstop=4
