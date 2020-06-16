@@ -14,6 +14,7 @@ import argparse
 import csv
 import logging
 import math
+from pathlib import Path
 import chess
 import chess.engine
 import chess.pgn
@@ -196,7 +197,7 @@ def judge_move(board, played_move, engine, searchtime_s):
     judgment = {}
 
     # First, get the engine bestmove and evaluation
-    limit = chess.engine.Limit(movetime=searchtime_ms / 2)
+    limit = chess.engine.Limit(time=searchtime_ms / 2)
     analysis = engine.play(board, limit, game=object())
 
     judgment["bestmove"] = analysis.info["pv"][1][0]
@@ -450,8 +451,8 @@ def classify_opening(game):
     Returns the classified game and root_node, which is the node where the
     classification was made
     """
-    ecopath = os.path.join(os.path.dirname(__file__), 'eco/a.tsv')
-    with open(ecopath, 'r') as ecofile:
+    ecopathlist = Path('.').glob('eco/*.tsv')
+    for ecopath in ecopathlist:
 
         ply_count = 0
 
@@ -477,7 +478,7 @@ def classify_opening(game):
             prev_node = node.parent
 
             fen = eco_fen(node.board())
-            classification = classify_fen(fen, ecofile)
+            classification = classify_fen(fen, ecopath)
 
             if classification["code"] != "":
                 # Add some comments classifying the opening
