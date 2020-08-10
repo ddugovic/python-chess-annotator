@@ -9,7 +9,7 @@ pytest-cov = "~=2.10.0"
 pytest-pudb = "~=0.7.0"
 
 [packages]
-python-chess = "==0.31.3"
+python-chess = "==0.31.4"
 
 [requires]
 python_version = "3.8"
